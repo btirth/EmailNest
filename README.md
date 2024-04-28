@@ -20,3 +20,4 @@ EmailNest application can be used by anyone who wants to connect with their audi
  - Use `AWS Simple Email Service` to send newsletters.
  - CI/CD pipeline  
  - Private VPC and Subnets to increase security
+ - `AWS Cognito` or `Firebase Authentication` for user management
