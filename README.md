@@ -15,3 +15,8 @@ EmailNest application can be used by anyone who wants to connect with their audi
 ## Architecture
 
 ![EmailNest Architecture](EmailNest-Arch.png)
+
+## Future Enhancements
+ - Use `AWS Simple Email Service` to send newsletters.
+ - CI/CD pipeline  
+ - Private VPC and Subnets to increase security
