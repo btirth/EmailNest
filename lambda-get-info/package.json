@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "aws-sdk": "^2.1590.0",
+    "mongoose": "^8.2.4"
+  },
+  "name": "lambda-get-info",
+  "version": "1.0.0",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

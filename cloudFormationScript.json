@@ -1,0 +1,534 @@
+{
+	"Resources": {
+		"Bucket": {
+			"Type": "AWS::S3::Bucket",
+			"Properties": {
+				"BucketName": "emailnestbucket",
+				"BucketEncryption": {
+					"ServerSideEncryptionConfiguration": [
+						{
+							"ServerSideEncryptionByDefault": {
+								"SSEAlgorithm": "aws:kms",
+								"KMSMasterKeyID": {
+									"Fn::GetAtt": [
+										"Key",
+										"Arn"
+									]
+								}
+							}
+						}
+					]
+				},
+				"PublicAccessBlockConfiguration": {
+					"IgnorePublicAcls": true,
+					"RestrictPublicBuckets": true
+				}
+			}
+		},
+		"BucketBucketPolicy": {
+			"Type": "AWS::S3::BucketPolicy",
+			"Properties": {
+				"Bucket": {
+					"Ref": "Bucket"
+				},
+				"PolicyDocument": {
+					"Id": "RequireEncryptionInTransit",
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Principal": "*",
+							"Action": "*",
+							"Effect": "Deny",
+							"Resource": [
+								{
+									"Fn::GetAtt": [
+										"Bucket",
+										"Arn"
+									]
+								},
+								{
+									"Fn::Sub": "${Bucket.Arn}/*"
+								}
+							],
+							"Condition": {
+								"Bool": {
+									"aws:SecureTransport": "false"
+								}
+							}
+						}
+					]
+				}
+			}
+		},
+		"Key": {
+			"Type": "AWS::KMS::Key",
+			"Properties": {
+				"Description": "KMS key for S3 encryption",
+				"KeyPolicy": {
+				"Version": "2012-10-17",
+				"Id": "key-default-1",
+				"Statement": [
+					{
+					"Sid": "Allow for S3 object encryption",
+					"Effect": "Allow",
+					"Principal": {
+						"Service": "s3.amazonaws.com"
+					},
+					"Action": [
+						"kms:Encrypt",
+						"kms:GenerateDataKey"
+					],
+					"Resource": "*"
+					},
+					{
+					"Sid": "Allow for S3 object decryption",
+					"Effect": "Allow",
+					"Principal": {
+						"Service": "s3.amazonaws.com"
+					},
+					"Action": "kms:Decrypt",
+					"Resource": "*"
+					}
+				]
+				}
+			}
+		},
+		"Secret": {
+			"Type": "AWS::SecretsManager::Secret",
+			"Properties": {
+				"Name": "MongoDBSecret",
+				"Description": "MongoDB credentials",
+				"SecretString": "{\"mongo_username\": \"tirth\", \"mongo_password\": \"tirth\"}"
+			}
+		},
+		"Application": {
+			"Type": "AWS::ElasticBeanstalk::Application",
+			"Properties": {
+				"ApplicationName": "EmailNestBackend",
+				"Description": "CSCI5409 Term Assignment - EmailNest"
+			}
+		},
+		"ApplicationVersion": {
+			"Type": "AWS::ElasticBeanstalk::ApplicationVersion",
+			"Properties": {
+				"ApplicationName": {
+					"Ref": "Application"
+				},
+				"SourceBundle": {
+					"S3Bucket": "emailnest-sourcecode",
+					"S3Key": "backendcode.zip"
+				}
+			}
+		},
+		"Environment": {
+			"Type": "AWS::ElasticBeanstalk::Environment",
+			"Properties": {
+				"ApplicationName": {
+					"Ref": "Application"
+				},
+				"EnvironmentName": "EmailNestBackendEnvironment",
+				"SolutionStackName": "64bit Amazon Linux 2023 v6.1.2 running Node.js 20",
+				"VersionLabel": {
+					"Ref": "ApplicationVersion"
+				},
+				"OptionSettings": [
+					{
+						"Namespace": "aws:autoscaling:launchconfiguration",
+						"OptionName": "IamInstanceProfile",
+						"Value": "arn:aws:iam::730335472482:instance-profile/LabInstanceProfile"
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:environment",
+						"OptionName": "ServiceRole",
+						"Value": "arn:aws:iam::730335472482:role/LabRole"
+					}
+				]
+			}
+		},
+        "FEApplication": {
+			"Type": "AWS::ElasticBeanstalk::Application",
+			"Properties": {
+				"ApplicationName": "EmailNestFrontend",
+				"Description": "CSCI5409 Term Assignment - EmailNest frontend"
+			}
+		},
+		"FEApplicationVersion": {
+			"Type": "AWS::ElasticBeanstalk::ApplicationVersion",
+			"Properties": {
+				"ApplicationName": {
+					"Ref": "FEApplication"
+				},
+				"SourceBundle": {
+					"S3Bucket": "emailnest-sourcecode",
+					"S3Key": "frontendcode.zip"
+				}
+			}
+		},
+		"FEEnvironment": {
+			"Type": "AWS::ElasticBeanstalk::Environment",
+			"Properties": {
+				"ApplicationName": {
+					"Ref": "FEApplication"
+				},
+				"EnvironmentName": "EmailNestFrontendEnvironment",
+				"SolutionStackName": "64bit Amazon Linux 2023 v6.1.2 running Node.js 20",
+				"VersionLabel": {
+					"Ref": "FEApplicationVersion"
+				},
+				"OptionSettings": [
+					{
+						"Namespace": "aws:autoscaling:launchconfiguration",
+						"OptionName": "IamInstanceProfile",
+						"Value": "arn:aws:iam::730335472482:instance-profile/LabInstanceProfile"
+					},
+					{
+						"Namespace": "aws:elasticbeanstalk:environment",
+						"OptionName": "ServiceRole",
+						"Value": "arn:aws:iam::730335472482:role/LabRole"
+					},
+                    {
+                        "Namespace": "aws:elasticbeanstalk:application:environment",
+                        "OptionName": "REACT_APP_BASE_URL",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    "http://",
+                                    {
+                                        "Fn::GetAtt": [
+                                            "Environment",
+                                            "EndpointURL"
+                                        ]
+                                    }
+                                ]
+                            ]
+                        }
+                      },
+                      {
+                        "Namespace": "aws:elasticbeanstalk:application:environment",
+                        "OptionName": "REACT_APP_LAMBDA_URL",
+                        "Value": {
+                          "Fn::Join": [
+                            "",
+                            [
+                              "https://",
+                              {
+                                "Ref": "EmailNestAPIGateway"
+                              },
+                              ".execute-api.",
+                              {
+                                "Ref": "AWS::Region"
+                              },
+                              ".amazonaws.com/prod"
+                            ]
+                          ]
+                        }
+                      }
+				]
+			}
+		},
+		"GetInfoLambdaFunction": {
+			"Type": "AWS::Lambda::Function",
+			"Properties": {
+				"Handler": "index.handler",
+				"Role": "arn:aws:iam::730335472482:role/LabRole",
+				"Code": {
+					"S3Bucket": "emailnest-sourcecode",
+					"S3Key": "getInfoLambdaFunction.zip"
+				},
+				"Runtime": "nodejs16.x"
+			}
+		},
+		"SaveEmailLambdaFunction": {
+			"Type": "AWS::Lambda::Function",
+			"Properties": {
+				"Handler": "index.handler",
+				"Role": "arn:aws:iam::730335472482:role/LabRole",
+				"Code": {
+					"S3Bucket": "emailnest-sourcecode",
+					"S3Key": "saveEmailLambdaFunction.zip"
+				},
+				"Runtime": "nodejs16.x"
+			}
+		},
+		"EmailNestAPIGateway": {
+			"Type": "AWS::ApiGateway::RestApi",
+			"Properties": {
+				"Name": "EmailNestAPIGateway"
+			}
+		},
+		"GetInfoLambdaPermission": {
+			"Type": "AWS::Lambda::Permission",
+			"Properties": {
+				"Action": "lambda:InvokeFunction",
+				"FunctionName": {
+					"Ref": "GetInfoLambdaFunction"
+				},
+				"Principal": "apigateway.amazonaws.com",
+				"SourceArn": {
+					"Fn::Join": [
+						"",
+						[
+							"arn:aws:execute-api:",
+							{
+								"Ref": "AWS::Region"
+							},
+							":",
+							{
+								"Ref": "AWS::AccountId"
+							},
+							":",
+							{
+								"Ref": "EmailNestAPIGateway"
+							},
+							"/*/*"
+						]
+					]
+				}
+			}
+		},
+		"SaveEmailLambdaPermission": {
+			"Type": "AWS::Lambda::Permission",
+			"Properties": {
+				"Action": "lambda:InvokeFunction",
+				"FunctionName": {
+					"Ref": "SaveEmailLambdaFunction"
+				},
+				"Principal": "apigateway.amazonaws.com",
+				"SourceArn": {
+					"Fn::Join": [
+						"",
+						[
+							"arn:aws:execute-api:",
+							{
+								"Ref": "AWS::Region"
+							},
+							":",
+							{
+								"Ref": "AWS::AccountId"
+							},
+							":",
+							{
+								"Ref": "EmailNestAPIGateway"
+							},
+							"/*/*"
+						]
+					]
+				}
+			}
+		},
+		"EmailNestAPIGatewayResource": {
+			"Type": "AWS::ApiGateway::Resource",
+			"Properties": {
+				"RestApiId": {
+					"Ref": "EmailNestAPIGateway"
+				},
+				"ParentId": {
+					"Fn::GetAtt": [
+						"EmailNestAPIGateway",
+						"RootResourceId"
+					]
+				},
+				"PathPart": "{id}"
+			}
+		},
+		"GetApiGatewayMethod": {
+			"Type": "AWS::ApiGateway::Method",
+			"Properties": {
+				"HttpMethod": "GET",
+				"ResourceId": {
+					"Ref": "EmailNestAPIGatewayResource"
+				},
+				"RestApiId": {
+					"Ref": "EmailNestAPIGateway"
+				},
+				"AuthorizationType": "NONE",
+				"RequestParameters": {
+					"method.request.path.id": true
+				},
+				"Integration": {
+					"IntegrationHttpMethod": "POST",
+					"Type": "AWS_PROXY",
+					"Uri": {
+						"Fn::Join": [
+							"",
+							[
+								"arn:aws:apigateway:",
+								{
+									"Ref": "AWS::Region"
+								},
+								":lambda:path/2015-03-31/functions/",
+								{
+									"Fn::GetAtt": [
+										"GetInfoLambdaFunction",
+										"Arn"
+									]
+								},
+								"/invocations"
+							]
+						]
+					},
+					"RequestParameters": {
+						"integration.request.path.id": "method.request.path.id"
+					}
+				},
+				"MethodResponses": [
+					{
+						"StatusCode": 200,
+						"ResponseModels": {
+							"application/json": "Empty"
+						}
+					}
+				]
+			}
+		},
+		"PostApiGatewayMethod": {
+			"Type": "AWS::ApiGateway::Method",
+			"Properties": {
+				"HttpMethod": "POST",
+				"ResourceId": {
+					"Ref": "EmailNestAPIGatewayResource"
+				},
+				"RestApiId": {
+					"Ref": "EmailNestAPIGateway"
+				},
+				"AuthorizationType": "NONE",
+				"RequestParameters": {
+					"method.request.path.id": true
+				},
+				"Integration": {
+					"IntegrationHttpMethod": "POST",
+					"Type": "AWS_PROXY",
+					"Uri": {
+						"Fn::Join": [
+							"",
+							[
+								"arn:aws:apigateway:",
+								{
+									"Ref": "AWS::Region"
+								},
+								":lambda:path/2015-03-31/functions/",
+								{
+									"Fn::GetAtt": [
+										"SaveEmailLambdaFunction",
+										"Arn"
+									]
+								},
+								"/invocations"
+							]
+						]
+					},
+					"RequestParameters": {
+						"integration.request.path.id": "method.request.path.id"
+					}
+				},
+				"MethodResponses": [
+					{
+						"StatusCode": 200,
+						"ResponseModels": {
+							"application/json": "Empty"
+						}
+					}
+				]
+			}
+		},
+		"OptionsApiGatewayMethod": {
+			"Type": "AWS::ApiGateway::Method",
+			"Properties": {
+				"HttpMethod": "OPTIONS",
+				"ResourceId": {
+					"Ref": "EmailNestAPIGatewayResource"
+				},
+				"RestApiId": {
+					"Ref": "EmailNestAPIGateway"
+				},
+				"AuthorizationType": "NONE",
+				"Integration": {
+					"Type": "MOCK",
+					"IntegrationResponses": [
+						{
+							"StatusCode": 200,
+							"ResponseParameters": {
+								"method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+								"method.response.header.Access-Control-Allow-Methods": "'GET,POST,OPTIONS'",
+								"method.response.header.Access-Control-Allow-Origin": "'*'"
+							},
+							"ResponseTemplates": {
+								"application/json": ""
+							}
+						}
+					],
+					"PassthroughBehavior": "WHEN_NO_MATCH",
+					"RequestTemplates": {
+						"application/json": "{\"statusCode\": 200}"
+					}
+				},
+				"MethodResponses": [
+					{
+						"StatusCode": 200,
+						"ResponseModels": {
+							"application/json": "Empty"
+						},
+						"ResponseParameters": {
+							"method.response.header.Access-Control-Allow-Headers": true,
+							"method.response.header.Access-Control-Allow-Methods": true,
+							"method.response.header.Access-Control-Allow-Origin": true
+						}
+					}
+				]
+			}
+		},
+		"EmailNestAPIGatewayDeployment": {
+			"Type": "AWS::ApiGateway::Deployment",
+			"Properties": {
+				"RestApiId": {
+					"Ref": "EmailNestAPIGateway"
+				},
+				"StageName": "prod"
+			},
+			"DependsOn": [
+				"GetApiGatewayMethod",
+				"OptionsApiGatewayMethod",
+				"PostApiGatewayMethod"
+			]
+		},
+		"GetInfoLambdaFunctionLogGroup": {
+			"Type": "AWS::Logs::LogGroup",
+			"DependsOn": "GetInfoLambdaFunction",
+			"DeletionPolicy": "Retain",
+			"Properties": {
+				"LogGroupName": {
+					"Fn::Join": [
+						"",
+						[
+							"/aws/lambda/",
+							{
+								"Ref": "GetInfoLambdaFunction"
+							}
+						]
+					]
+				},
+				"RetentionInDays": 14
+			}
+		},
+		"SaveEmailLambdaFunctionLogGroup": {
+			"Type": "AWS::Logs::LogGroup",
+			"DependsOn": "SaveEmailLambdaFunction",
+			"DeletionPolicy": "Retain",
+			"Properties": {
+				"LogGroupName": {
+					"Fn::Join": [
+						"",
+						[
+							"/aws/lambda/",
+							{
+								"Ref": "SaveEmailLambdaFunction"
+							}
+						]
+					]
+				},
+				"RetentionInDays": 14
+			}
+		}
+	}
+}
